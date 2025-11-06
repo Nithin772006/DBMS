@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Learning Platform Dashboard</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* Dark Navy/Gray */
+            color: #f3f4f6; /* Light text for dark background */
+        }
+        .card {
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 0 40px rgba(79, 70, 229, 0.4); /* Glowing Indigo */
+            border-color: #4f46e5;
+        }
+        body::-webkit-scrollbar {
+            width: 8px;
+        }
+        body::-webkit-scrollbar-thumb {
+            background-color: #374151;
+            border-radius: 4px;
+        }
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(5px);
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+    
+    <!-- Global Mock Authentication State -->
+    <script>
+        // MOCK AUTH: Use this variable to store the "logged-in" user ID. 
+        // We use ID 4 from app.py, which is the 'Mock Student User'.
+        let MOCK_USER_ID = null; 
+        let MOCK_USER_NAME = 'Guest';
+
+        function checkLoginState() {
+            const loginButton = document.getElementById('login-button');
+            const welcomeSpan = document.getElementById('welcome-user');
+            
+            if (MOCK_USER_ID) {
+                welcomeSpan.textContent = `Welcome, ${MOCK_USER_NAME}`;
+                loginButton.textContent = 'Sign Out';
+                // Sign out function is now linked here
+                loginButton.onclick = mockSignOut; 
+                loginButton.classList.add('bg-gray-700', 'hover:bg-gray-600');
+                loginButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+            } else {
+                welcomeSpan.textContent = '';
+                loginButton.textContent = 'Sign In';
+                loginButton.onclick = showSignInView;
+                loginButton.classList.remove('bg-gray-700', 'hover:bg-gray-600');
+                loginButton.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            }
+        }
+        
+        function mockSignIn() {
+            // Hardcode to ID 4, the student user added in app.py
+            MOCK_USER_ID = 4;
+            MOCK_USER_NAME = document.getElementById('username-input').value || 'Student'; 
+            document.getElementById('welcome-user').textContent = `Welcome, ${MOCK_USER_NAME}`;
+            
+            checkLoginState();
+            showCourseList(); 
+            document.getElementById('sign-in-view').classList.add('hidden');
+            fetchCourses(); // Reload courses to show enrollments if applicable
+        }
+        
+        function mockSignOut() {
+            MOCK_USER_ID = null;
+            MOCK_USER_NAME = 'Guest';
+            checkLoginState();
+            // Go to course list, which will reload and show "Enroll" again
+            showCourseList();
+            fetchCourses();
+        }
+    </script>
+    
+    <header class="mb-10 text-center flex justify-between items-center max-w-6xl mx-auto">
+        <div>
+            <span id="welcome-user" class="text-sm text-gray-400 mr-4 font-medium"></span>
+            <button id="login-button" onclick="showSignInView()" class="px-4 py-2 text-white text-sm font-semibold rounded-lg transition duration-150 ease-in-out bg-indigo-600 hover:bg-indigo-700">
+                Sign In
+            </button>
+        </div>
+        <h1 class="text-4xl sm:text-5xl font-extrabold text-indigo-400 tracking-tight flex-grow text-center ml-[-120px]">
+            LearnVerse
+        </h1>
+        <div class="w-24"></div> <!-- Placeholder for centering -->
+    </header>
+
+    <main class="max-w-6xl mx-auto">
+        
+        <!-- MOCK SIGN IN VIEW -->
+        <div id="sign-in-view" class="hidden flex justify-center items-center h-[60vh]">
+            <div class="bg-gray-800 p-8 rounded-xl shadow-2xl border border-indigo-900 w-full max-w-md">
+                <h2 class="text-3xl font-bold text-gray-100 mb-6 text-center">Sign In</h2>
+                <p class="text-gray-400 mb-6 text-center">Enter your name to simulate a logged-in student.</p>
+                <input type="text" id="username-input" placeholder="Your Name" class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-6" value="Mock Student">
+                <button onclick="mockSignIn()" class="w-full py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition duration-150">
+                    Sign In (Mock Student ID: 4)
+                </button>
+                <button onclick="showCourseList()" class="w-full mt-3 py-3 bg-gray-700 text-gray-300 font-bold rounded-lg hover:bg-gray-600 transition duration-150">
+                    Continue as Guest
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Course List View -->
+        <div id="course-list-view">
+            <h2 class="text-2xl font-bold text-gray-100 mb-6 border-b border-indigo-700 pb-2">Available Courses</h2>
+            <div id="course-container" class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+                <!-- Courses will be dynamically inserted here -->
+                <p id="loading-message" class="col-span-full text-center text-lg text-indigo-400">
+                    Loading courses...
+                </p>
+            </div>
+        </div>
+
+        <!-- Course Detail View (Initially Hidden) -->
+        <div id="course-detail-view" class="hidden bg-gray-800 p-8 rounded-xl shadow-2xl border border-indigo-900">
+            <button onclick="showCourseList()" class="text-indigo-400 hover:text-indigo-200 flex items-center mb-8 transition duration-150 ease-in-out">
+                <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                Back to all Courses
+            </button>
+            
+            <h2 id="detail-title" class="text-4xl font-bold text-gray-100 mb-2"></h2>
+            <p class="text-gray-400 mb-4">Instructor: <span id="detail-instructor" class="font-medium text-indigo-400"></span></p>
+            
+            <!-- Enrollment/Buy Section -->
+            <div class="flex items-center justify-between mb-8 pb-4 border-b border-gray-700">
+                <p class="text-xl text-gray-300 font-semibold" id="enrollment-status">Status: Not Enrolled</p>
+                <button id="enroll-button" class="py-2 px-6 rounded-lg text-lg font-bold transition duration-150">
+                    Buy/Enroll Now
+                </button>
+            </div>
+            
+            <div class="bg-gray-900 p-5 rounded-lg mb-8 border border-indigo-800">
+                <p id="detail-description" class="text-gray-300"></p>
+            </div>
+
+            <h3 class="text-2xl font-semibold text-gray-100 mb-4 mt-8 border-b border-gray-700 pb-2">Course Lessons</h3>
+            <ul id="lesson-list" class="space-y-4">
+                <!-- Lessons will be dynamically inserted here -->
+            </ul>
+        </div>
+        
+        <!-- PAYMENT MODAL (Hidden by default) -->
+        <div id="payment-modal" class="fixed inset-0 hidden modal-overlay z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-800 p-8 rounded-xl shadow-2xl border border-indigo-900 w-full max-w-lg transform transition-all duration-300 scale-100">
+                <h3 class="text-2xl font-bold text-gray-100 mb-6 border-b border-gray-700 pb-2">Complete Your Enrollment</h3>
+                
+                <div class="space-y-4">
+                    <p class="text-gray-300 text-lg font-medium">Course: <span id="modal-course-title" class="text-indigo-400"></span></p>
+                    <p class="text-gray-300 text-lg font-medium">Price: <span class="text-green-400 font-bold">$49.99 (Mock Payment)</span></p>
+                    
+                    <!-- Mock Payment Form -->
+                    <div class="mt-6 space-y-3">
+                        <input type="text" placeholder="Card Number (4242...)" class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <div class="flex space-x-3">
+                            <input type="text" placeholder="MM/YY" class="w-1/2 p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <input type="text" placeholder="CVC" class="w-1/2 p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-4 mt-8">
+                    <button onclick="hidePaymentModal()" class="px-6 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-500 transition duration-150">
+                        Cancel
+                    </button>
+                    <button id="confirm-payment-button" onclick="enrollInCourse(currentCourseId)" class="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition duration-150">
+                        Pay $49.99 & Enroll
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Error Message Box (Dark theme compliant) -->
+        <div id="error-message" class="hidden fixed bottom-5 right-5 bg-red-700 text-gray-100 p-4 rounded-lg shadow-xl" role="alert">
+            <p>An error occurred. Please ensure the Python backend is running.</p>
+        </div>
+
+    </main>
+
+    <script>
+        const API_BASE_URL = 'http://127.0.0.1:5000/api';
+
+        const courseContainer = document.getElementById('course-container');
+        const courseListView = document.getElementById('course-list-view');
+        const courseDetailView = document.getElementById('course-detail-view');
+        const signInView = document.getElementById('sign-in-view');
+        const paymentModal = document.getElementById('payment-modal');
+        const loadingMessage = document.getElementById('loading-message');
+        const errorMessage = document.getElementById('error-message');
+        const enrollmentStatus = document.getElementById('enrollment-status');
+        const enrollButton = document.getElementById('enroll-button');
+        let currentCourseId = null; // Track the course ID for the detail view
+        let currentCourseTitle = ''; // Track the course title for the modal
+
+        /**
+         * Shows a temporary error message box.
+         */
+        function showError(message) {
+            errorMessage.querySelector('p').textContent = message || "An unexpected error occurred.";
+            errorMessage.classList.remove('hidden');
+            loadingMessage.classList.add('hidden'); 
+            setTimeout(() => {
+                errorMessage.classList.add('hidden');
+            }, 5000);
+        }
+
+        /**
+         * Toggles the view between different main screens.
+         */
+        function toggleView(view) {
+            const views = {
+                'course-list': courseListView,
+                'course-detail': courseDetailView,
+                'sign-in': signInView
+            };
+            
+            Object.values(views).forEach(v => v.classList.add('hidden'));
+            
+            if (views[view]) {
+                views[view].classList.remove('hidden');
+            }
+        }
+
+        function showCourseList() { toggleView('course-list'); }
+        function showCourseDetail() { toggleView('course-detail'); }
+        function showSignInView() { toggleView('sign-in'); }
+
+        // Modal Controls
+        function showPaymentModal() { paymentModal.classList.remove('hidden'); }
+        function hidePaymentModal() { paymentModal.classList.add('hidden'); }
+
+        /**
+         * Renders a single course card for the main list view.
+         */
+        function renderCourseCard(course) {
+            const card = document.createElement('div');
+            card.className = 'card bg-gray-800 p-6 rounded-xl shadow-lg border border-indigo-900 cursor-pointer hover:border-indigo-400';
+            card.setAttribute('data-id', course.id);
+            card.innerHTML = `
+                <h3 class="text-xl font-bold text-gray-100 mb-2">${course.title}</h3>
+                <p class="text-sm text-indigo-400 font-medium mb-3">Instructor: ${course.instructor_name}</p>
+                <p class="text-gray-300 line-clamp-3">${course.description}</p>
+                <span class="mt-4 inline-block text-sm font-semibold text-white bg-indigo-600 px-3 py-1 rounded-full hover:bg-indigo-700 transition duration-150">View Details</span>
+            `;
+            card.onclick = () => fetchCourseDetail(course.id);
+            courseContainer.appendChild(card);
+        }
+
+        /**
+         * Fetches all courses from the Python backend and renders the list.
+         */
+        async function fetchCourses() {
+            loadingMessage.classList.remove('hidden');
+            courseContainer.innerHTML = ''; 
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/courses`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const courses = await response.json();
+                
+                loadingMessage.classList.add('hidden');
+                if (courses.length === 0) {
+                    courseContainer.innerHTML = '<p class="col-span-full text-center text-lg text-gray-500">No courses available.</p>';
+                } else {
+                    courses.forEach(renderCourseCard);
+                }
+
+            } catch (error) {
+                loadingMessage.classList.add('hidden');
+                console.error("Failed to fetch courses:", error);
+                showError("Could not connect to the Python backend server at " + API_BASE_URL + ". Please ensure 'python app.py' is running in your terminal.");
+                courseContainer.innerHTML = '<p class="col-span-full text-center text-lg text-red-500">Connection Error. Please check the console and ensure the backend server is running.</p>';
+            }
+        }
+
+        /**
+         * Fetches details and lessons for a specific course, including enrollment status.
+         */
+        async function fetchCourseDetail(courseId) {
+            currentCourseId = courseId; // Set current course ID
+            showCourseDetail(); // Show detail view
+            
+            document.getElementById('detail-title').textContent = 'Loading...';
+            
+            // Build the URL with the user_id if logged in
+            let url = `${API_BASE_URL}/course/${courseId}`;
+            if (MOCK_USER_ID) {
+                url += `?user_id=${MOCK_USER_ID}`;
+            }
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const course = await response.json();
+                
+                currentCourseTitle = course.title; // Save title for modal
+
+                // --- Enrollment Logic Update ---
+                if (MOCK_USER_ID) {
+                    if (course.is_enrolled) {
+                        enrollmentStatus.textContent = 'Status: Enrolled (Access Granted)';
+                        enrollmentStatus.classList.remove('text-red-400');
+                        enrollmentStatus.classList.add('text-green-400');
+                        enrollButton.textContent = 'View Course';
+                        enrollButton.className = 'py-2 px-6 rounded-lg text-lg font-bold transition duration-150 bg-green-600 hover:bg-green-700 text-white';
+                        // Mock view access: just logs to console
+                        enrollButton.onclick = () => console.log(`Viewing Course ${courseId}...`); 
+                    } else {
+                        enrollmentStatus.textContent = 'Status: Not Enrolled';
+                        enrollmentStatus.classList.remove('text-green-400');
+                        enrollmentStatus.classList.add('text-red-400');
+                        enrollButton.textContent = 'Buy/Enroll Now';
+                        enrollButton.className = 'py-2 px-6 rounded-lg text-lg font-bold transition duration-150 bg-indigo-600 hover:bg-indigo-700 text-white';
+                        // Show payment modal before enrollment API call
+                        enrollButton.onclick = () => {
+                            document.getElementById('modal-course-title').textContent = currentCourseTitle;
+                            showPaymentModal();
+                        };
+                    }
+                } else {
+                    enrollmentStatus.textContent = 'Status: Sign in to Enroll';
+                    enrollmentStatus.classList.remove('text-green-400', 'text-red-400');
+                    enrollmentStatus.classList.add('text-gray-500');
+                    enrollButton.textContent = 'Sign In';
+                    enrollButton.className = 'py-2 px-6 rounded-lg text-lg font-bold transition duration-150 bg-gray-600 hover:bg-gray-500 text-white';
+                    enrollButton.onclick = showSignInView;
+                }
+                // --- End Enrollment Logic Update ---
+
+
+                // Update detail elements
+                document.getElementById('detail-title').textContent = course.title;
+                document.getElementById('detail-instructor').textContent = course.instructor_name;
+                document.getElementById('detail-description').textContent = course.description;
+
+                // Render lessons
+                const lessonList = document.getElementById('lesson-list');
+                lessonList.innerHTML = ''; 
+
+                if (course.lessons && course.lessons.length > 0) {
+                    course.lessons.forEach((lesson, index) => {
+                        const listItem = document.createElement('li');
+                        listItem.className = 'bg-gray-900 p-4 rounded-lg border border-indigo-900 shadow-md';
+                        listItem.innerHTML = `
+                            <div class="flex items-center space-x-3">
+                                <span class="text-lg font-semibold text-indigo-400">${index + 1}.</span>
+                                <h4 class="text-lg font-medium text-gray-200">${lesson.title}</h4>
+                            </div>
+                            <p class="mt-2 text-sm text-gray-400">${lesson.content}</p>
+                        `;
+                        lessonList.appendChild(listItem);
+                    });
+                } else {
+                    lessonList.innerHTML = '<li class="text-gray-500">No lessons defined for this course yet.</li>';
+                }
+
+            } catch (error) {
+                console.error("Failed to fetch course detail:", error);
+                showError("Could not load course details. Please ensure the Python backend is running.");
+                showCourseList(); 
+            }
+        }
+        
+        /**
+         * Handles the enrollment process by calling the backend API after mock payment.
+         */
+        async function enrollInCourse(courseId) {
+            hidePaymentModal(); // Close the modal first
+
+            if (!MOCK_USER_ID) {
+                showSignInView();
+                return;
+            }
+
+            // Simulate Payment Processing Delay
+            enrollButton.textContent = 'Processing...';
+            enrollButton.disabled = true;
+            await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 second "payment processing"
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/enroll`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_id: MOCK_USER_ID,
+                        course_id: courseId
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Enrollment failed with status: ${response.status}`);
+                }
+
+                // Enrollment was successful (API call went through, database record was inserted)
+                showError(`Payment successful! Welcome to the course: ${currentCourseTitle}`, 5000, 'bg-green-600');
+                
+                // Re-fetch detail to update status and button
+                fetchCourseDetail(courseId);
+
+            } catch (error) {
+                console.error("Enrollment error:", error);
+                showError("Enrollment failed. See console for details.", 7000, 'bg-red-700');
+                enrollButton.textContent = 'Buy/Enroll Now';
+                enrollButton.disabled = false;
+            }
+        }
+
+        // Initialize: Check login state and show the sign-in screen first.
+        window.onload = () => {
+            checkLoginState();
+            showSignInView();
+        };
+    </script>
+
+</body>
+</html>
